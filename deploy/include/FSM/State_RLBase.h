@@ -6,6 +6,9 @@
 #include "FSMState.h"
 #include "isaaclab/envs/mdp/actions/joint_actions.h"
 #include "isaaclab/envs/mdp/terminations.h"
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 
 class State_RLBase : public FSMState
 {
@@ -44,6 +47,8 @@ public:
                 sleepTill += dt;
             }
         });
+
+        start_lowstate_logger();
     }
 
     void run();
@@ -54,10 +59,28 @@ public:
         if (policy_thread.joinable()) {
             policy_thread.join();
         }
+        stop_lowstate_logger();
     }
 
 private:
+    void configure_lowstate_logger(const YAML::Node& cfg, const std::string& state_string);
+    void start_lowstate_logger();
+    void write_lowstate_log_header();
+    void write_lowstate_log_sample();
+    void stop_lowstate_logger();
+
     std::unique_ptr<isaaclab::ManagerBasedRLEnv> env;
+    std::vector<std::vector<float>> safe_joint_position_limits_;
+
+    bool lowstate_log_enabled_ = false;
+    double lowstate_log_rate_ = 200.0;
+    std::string lowstate_log_path_template_;
+    std::filesystem::path lowstate_log_path_;
+    std::ofstream lowstate_log_file_;
+    std::chrono::steady_clock::time_point lowstate_log_start_time_;
+    std::chrono::steady_clock::time_point lowstate_log_next_sample_time_;
+    std::chrono::steady_clock::duration lowstate_log_period_{std::chrono::milliseconds(5)};
+    std::size_t lowstate_log_samples_ = 0;
 
     std::thread policy_thread;
     bool policy_thread_running = false;

@@ -44,6 +44,33 @@ public:
             }
         }
 
+        auto keyboard_transitions = param::config["FSM"][state_string]["keyboard_transitions"];
+        if(keyboard_transitions)
+        {
+            auto transition_map = keyboard_transitions.as<std::map<std::string, std::string>>();
+
+            for(auto it = transition_map.begin(); it != transition_map.end(); ++it)
+            {
+                std::string target_fsm = it->first;
+                if(!FSMStringMap.right.count(target_fsm))
+                {
+                    spdlog::warn("FSM State_'{}' not found in FSMStringMap!", target_fsm);
+                    continue;
+                }
+
+                int fsm_id = FSMStringMap.right.at(target_fsm);
+                std::string key = it->second;
+                registered_checks.emplace_back(
+                    std::make_pair(
+                        [key]()->bool{
+                            return FSMState::keyboard && FSMState::keyboard->on_pressed && FSMState::keyboard->key() == key;
+                        },
+                        fsm_id
+                    )
+                );
+            }
+        }
+
         // register for all states
         registered_checks.emplace_back(
             std::make_pair(

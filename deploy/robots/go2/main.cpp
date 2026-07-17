@@ -36,6 +36,7 @@ int main(int argc, char** argv)
     unitree::robot::ChannelFactory::Instance()->Init(0, vm["network"].as<std::string>());
 
     init_fsm_state();
+    FSMState::keyboard = std::make_shared<Keyboard>();
 
     // Initialize FSM
     auto fsm = std::make_unique<CtrlFSM>(param::config["FSM"]);
@@ -43,6 +44,7 @@ int main(int argc, char** argv)
 
     std::cout << "Press [L2 + A] to enter FixStand mode.\n";
     std::cout << "And then press [Start] to start controlling the robot.\n";
+    std::cout << "No joystick keyboard mode: [f] FixStand, [v] Velocity, [p] Passive.\n";
 
     while (true)
     {
@@ -51,4 +53,3 @@ int main(int argc, char** argv)
     
     return 0;
 }
-
