@@ -19,6 +19,42 @@ def format_value(x):
         return x
 
 
+GO2_JOINT_SDK_NAMES = [
+    "FR_hip_joint",
+    "FR_thigh_joint",
+    "FR_calf_joint",
+    "FL_hip_joint",
+    "FL_thigh_joint",
+    "FL_calf_joint",
+    "RR_hip_joint",
+    "RR_thigh_joint",
+    "RR_calf_joint",
+    "RL_hip_joint",
+    "RL_thigh_joint",
+    "RL_calf_joint",
+]
+
+GO2_JOINT_POSITION_LIMITS_SDK_ORDER = [
+    [-0.8378, 0.8378],
+    [-1.5708, 3.4907],
+    [-2.7227, -0.8378],
+    [-0.8378, 0.8378],
+    [-1.5708, 3.4907],
+    [-2.7227, -0.8378],
+    [-0.8378, 0.8378],
+    [-0.5236, 4.5379],
+    [-2.7227, -0.8378],
+    [-0.8378, 0.8378],
+    [-0.5236, 4.5379],
+    [-2.7227, -0.8378],
+]
+
+def joint_position_limits_for_deploy(asset: Articulation, joint_sdk_names: list[str], joint_ids_map: list[int]):
+    if joint_sdk_names == GO2_JOINT_SDK_NAMES:
+        return [GO2_JOINT_POSITION_LIMITS_SDK_ORDER[sdk_id] for sdk_id in joint_ids_map]
+    return asset.data.soft_joint_pos_limits[0].detach().cpu().numpy().tolist()
+
+
 def export_deploy_cfg(env: ManagerBasedRLEnv, log_dir):
     asset: Articulation = env.scene["robot"]
     joint_sdk_names = env.cfg.scene.robot.joint_sdk_names
@@ -34,6 +70,9 @@ def export_deploy_cfg(env: ManagerBasedRLEnv, log_dir):
     damping[joint_ids_map] = asset.data.default_joint_damping[0].detach().cpu().numpy().tolist()
     cfg["damping"] = damping.tolist()
     cfg["default_joint_pos"] = asset.data.default_joint_pos[0].detach().cpu().numpy().tolist()
+    cfg["safety"] = {
+        "joint_position_limits": joint_position_limits_for_deploy(asset, joint_sdk_names, joint_ids_map),
+    }
 
     # --- commands ---
     cfg["commands"] = {}
