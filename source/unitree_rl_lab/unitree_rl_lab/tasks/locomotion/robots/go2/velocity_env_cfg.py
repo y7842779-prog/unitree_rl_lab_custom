@@ -185,6 +185,35 @@ class EventCfg:
 
 
 @configclass
+class PayloadDREventCfg(EventCfg):
+    """Payload randomization events for the staged PayloadDR baseline."""
+
+    add_base_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "mass_distribution_params": (0.0, 3.0),
+            "operation": "add",
+            "recompute_inertia": True,
+        },
+    )
+
+    base_com = EventTerm(
+        func=mdp.randomize_rigid_body_com_from_default,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "com_range": {
+                "x": (-0.02, 0.02),
+                "y": (-0.015, 0.015),
+                "z": (-0.005, 0.005),
+            },
+        },
+    )
+
+
+@configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
 

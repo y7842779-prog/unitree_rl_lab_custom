@@ -12,12 +12,23 @@ gym.register(
 )
 
 gym.register(
-    id="Unitree-Go2-Velocity-Rough",
+    id="Unitree-Go2-PPO-DR-Rough",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.rough_env_cfg:RoughRobotEnvCfg",
         "play_env_cfg_entry_point": f"{__name__}.rough_env_cfg:RoughRobotPlayEnvCfg",
+        "rsl_rl_cfg_entry_point": f"unitree_rl_lab.tasks.locomotion.agents.rsl_rl_ppo_cfg:BasePPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Unitree-Go2-PPO-DR-Rough-Curriculum",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_env_cfg:RoughPayloadDRRobotEnvCfg",
+        "play_env_cfg_entry_point": f"{__name__}.rough_env_cfg:RoughPayloadDRRobotPlayEnvCfg",
         "rsl_rl_cfg_entry_point": f"unitree_rl_lab.tasks.locomotion.agents.rsl_rl_ppo_cfg:BasePPORunnerCfg",
     },
 )
