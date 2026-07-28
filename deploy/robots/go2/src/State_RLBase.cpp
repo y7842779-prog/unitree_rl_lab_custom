@@ -4,6 +4,7 @@
 #include "isaaclab/envs/mdp/actions/joint_actions.h"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -39,6 +40,37 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
     else if(key == "e") obs[2] = yaw_min;
 
     return obs;
+}
+
+
+REGISTER_OBSERVATION(history_base_ang_vel)
+{
+    return mdp::base_ang_vel(env, params);
+}
+
+REGISTER_OBSERVATION(history_projected_gravity)
+{
+    return mdp::projected_gravity(env, params);
+}
+
+REGISTER_OBSERVATION(history_keyboard_velocity_commands)
+{
+    return keyboard_velocity_commands(env, params);
+}
+
+REGISTER_OBSERVATION(history_joint_pos_rel)
+{
+    return mdp::joint_pos_rel(env, params);
+}
+
+REGISTER_OBSERVATION(history_joint_vel_rel)
+{
+    return mdp::joint_vel_rel(env, params);
+}
+
+REGISTER_OBSERVATION(history_last_action)
+{
+    return mdp::last_action(env, params);
 }
 
 }
@@ -114,8 +146,26 @@ State_RLBase::State_RLBase(int state_mode, std::string state_string)
 void State_RLBase::run()
 {
     auto action = env->action_manager->processed_actions();
-    for(int i(0); i < env->robot->data.joint_ids_map.size(); i++) {
+    const auto joint_count = env->robot->data.joint_ids_map.size();
+    if (action.size() < joint_count) {
+        static bool warned_action_size = false;
+        if (!warned_action_size) {
+            spdlog::error("Policy action size {} is smaller than joint count {}.", action.size(), joint_count);
+            warned_action_size = true;
+        }
+        return;
+    }
+
+    static bool warned_nonfinite_q_target = false;
+    for(int i(0); i < joint_count; i++) {
         float q_target = action[i];
+        if (!std::isfinite(q_target)) {
+            if (!warned_nonfinite_q_target) {
+                spdlog::error("Policy produced a non-finite q target. Falling back to default joint positions.");
+                warned_nonfinite_q_target = true;
+            }
+            q_target = env->robot->data.default_joint_pos[i];
+        }
         if (!safe_joint_position_limits_.empty()) {
             const auto& limit = safe_joint_position_limits_[i];
             q_target = std::clamp(q_target, limit[0], limit[1]);

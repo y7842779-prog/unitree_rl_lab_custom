@@ -34,7 +34,7 @@ FSM:
       Passive: LT + B.on_pressed
     keyboard_transitions:
       Passive: p
-    policy_dir: /home/hyc/unitree_rl_lab/scripts/rsl_rl/logs/rsl_rl/unitree_go2_ppo_dr_rough_curriculum/2026-07-20_11-50-26
+    policy_dir: /home/hyc/unitree_rl_lab/scripts/rsl_rl/logs/rsl_rl/go2_moe_cts_137000_0.6713/huggingface
     lowstate_log:
       enable: true
       path: /home/hyc/unitree_rl_lab/results/policy_lowstate_{time}.csv

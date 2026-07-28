@@ -9,6 +9,7 @@
 #include "isaaclab/manager/action_manager.h"
 #include "isaaclab/assets/articulation/articulation.h"
 #include "isaaclab/algorithms/algorithms.h"
+#include <cmath>
 #include <iostream>
 #include "isaaclab/utils/utils.h"
 
@@ -62,6 +63,20 @@ public:
         robot->update();
         auto obs = observation_manager->compute();
         auto action = alg->act(obs);
+        bool has_nonfinite_action = false;
+        for (auto& value : action) {
+            if (!std::isfinite(value)) {
+                value = 0.0f;
+                has_nonfinite_action = true;
+            }
+        }
+        if (has_nonfinite_action) {
+            static bool warned_nonfinite_action = false;
+            if (!warned_nonfinite_action) {
+                std::cerr << "Policy produced non-finite raw actions. Replacing them with zeros.\n";
+                warned_nonfinite_action = true;
+            }
+        }
         action_manager->process_action(action);
     }
 
