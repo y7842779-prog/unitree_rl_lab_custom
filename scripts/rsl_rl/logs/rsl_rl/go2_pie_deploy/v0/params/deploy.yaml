@@ -42,7 +42,7 @@ pie:
 
   # First deployment version accepts a preprocessed normalized 60x86 depth frame.
   # Use binary_file after writing one float32 frame to depth_binary_path.
-  depth_provider: constant
+  depth_provider: binary_file
   depth_constant: 0.7
   depth_binary_path: /tmp/pie_depth_60x86_float32.bin
   depth_update_period_steps: 5

@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
 namespace
@@ -18,6 +20,7 @@ constexpr std::size_t kNumJoints = 12;
 constexpr std::size_t kProprioHistoryLength = 10;
 constexpr std::size_t kDepthHistoryLength = 2;
 constexpr std::size_t kDepthFrameDim = 60 * 86;
+constexpr std::size_t kDepthFrameBytes = kDepthFrameDim * sizeof(float);
 
 const std::array<int, 6> kTermDims = {3, 3, 3, 12, 12, 12};
 
@@ -79,6 +82,31 @@ std::string format_vector(const std::vector<float>& values, int precision = 3)
     }
     stream << "]";
     return stream.str();
+}
+
+float mean(const std::vector<float>& values)
+{
+    if (values.empty()) {
+        return 0.0f;
+    }
+    float sum = 0.0f;
+    for (const float value : values) {
+        sum += value;
+    }
+    return sum / static_cast<float>(values.size());
+}
+
+std::vector<float> depth_samples(const std::vector<float>& depth_history, std::size_t frame_index)
+{
+    const std::size_t start = frame_index * kDepthFrameDim;
+    if (depth_history.size() < start + kDepthFrameDim) {
+        return {};
+    }
+    return {
+        depth_history[start],
+        depth_history[start + 100],
+        depth_history[start + kDepthFrameDim - 1],
+    };
 }
 
 } // namespace
@@ -387,6 +415,14 @@ void State_PIE::update_depth_history()
 std::vector<float> State_PIE::load_depth_file() const
 {
     std::vector<float> frame(kDepthFrameDim, depth_constant_);
+    std::error_code file_error;
+    const auto file_size = std::filesystem::file_size(depth_binary_path_, file_error);
+    last_depth_file_size_ = file_error ? 0 : static_cast<std::size_t>(file_size);
+    last_depth_read_complete_ = false;
+    if (file_error || last_depth_file_size_ != kDepthFrameBytes) {
+        return frame;
+    }
+
     std::ifstream file(depth_binary_path_, std::ios::binary);
     if (!file.is_open()) {
         return frame;
@@ -395,6 +431,7 @@ std::vector<float> State_PIE::load_depth_file() const
     if (file.gcount() != static_cast<std::streamsize>(frame.size() * sizeof(float))) {
         return std::vector<float>(kDepthFrameDim, depth_constant_);
     }
+    last_depth_read_complete_ = true;
     return frame;
 }
 
@@ -426,8 +463,11 @@ void State_PIE::maybe_log_debug(
     const auto proprio_range = min_max(proprio);
     const auto depth_range = min_max(depth);
     const auto action_range = min_max(action);
+    const auto depth_frame0_samples = depth_samples(depth, 0);
+    const auto depth_frame1_samples = depth_samples(depth, 1);
     const std::size_t memory_size = policy_ ? policy_->memory_size() : 0;
     const float memory_norm = policy_ ? policy_->memory_norm() : 0.0f;
+    const char* depth_read_status = last_depth_read_complete_ ? "ok" : "fallback";
 
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(3)
@@ -439,6 +479,12 @@ void State_PIE::maybe_log_debug(
            << "memory size   = " << memory_size << "\n\n"
            << "proprio min/max = [" << proprio_range.first << ", " << proprio_range.second << "]\n"
            << "depth min/max   = [" << depth_range.first << ", " << depth_range.second << "]\n"
+           << "depth mean      = " << mean(depth) << "\n"
+           << "depth provider  = " << depth_provider_ << "\n"
+           << "depth file      = " << last_depth_file_size_ << "/" << kDepthFrameBytes
+           << " bytes (" << depth_read_status << ")\n"
+           << "depth hist[0][0,100,last] = " << format_vector(depth_frame0_samples) << "\n"
+           << "depth hist[1][0,100,last] = " << format_vector(depth_frame1_samples) << "\n"
            << "memory norm     = " << memory_norm << "\n\n"
            << "action =\n"
            << format_vector(action) << "\n\n"

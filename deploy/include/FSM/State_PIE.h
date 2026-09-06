@@ -68,6 +68,8 @@ private:
     std::thread policy_thread_;
     std::atomic<bool> policy_thread_running_{false};
     std::atomic<bool> warned_policy_error_{false};
+    mutable std::size_t last_depth_file_size_ = 0;
+    mutable bool last_depth_read_complete_ = false;
 
     float step_dt_ = 0.02f;
     float keyboard_lin_vel_x_ = 0.4f;
