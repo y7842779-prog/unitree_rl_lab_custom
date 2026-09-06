@@ -149,6 +149,8 @@ State_PIE::State_PIE(int state_mode, std::string state_string)
     keyboard_ang_vel_z_ = yaml_value<float>(pie_cfg_, "keyboard_ang_vel_z", 0.4f);
     joystick_lin_vel_x_ = yaml_value<float>(pie_cfg_, "joystick_lin_vel_x", 0.8f);
     joystick_ang_vel_z_ = yaml_value<float>(pie_cfg_, "joystick_ang_vel_z", 1.2f);
+    constant_command_ = yaml_vector<float>(pie_cfg_, "constant_command", {0.4f, 0.0f, 0.0f});
+    require_size("pie.constant_command", constant_command_, 3);
     zero_command_threshold_ = yaml_value<float>(pie_cfg_, "zero_command_threshold", 0.05f);
     hold_stand_when_zero_ = yaml_value<bool>(pie_cfg_, "hold_stand_when_zero", true);
 
@@ -348,6 +350,10 @@ void State_PIE::policy_loop()
 std::vector<float> State_PIE::command_vector() const
 {
     std::vector<float> command(3, 0.0f);
+    if (command_source_ == "constant") {
+        return constant_command_;
+    }
+
     const bool use_keyboard = command_source_ == "keyboard" || command_source_ == "auto";
     const bool use_joystick = command_source_ == "joystick" || command_source_ == "auto";
 

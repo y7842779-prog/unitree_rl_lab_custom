@@ -77,6 +77,7 @@ private:
     float keyboard_ang_vel_z_ = 0.4f;
     float joystick_lin_vel_x_ = 0.8f;
     float joystick_ang_vel_z_ = 1.2f;
+    std::vector<float> constant_command_{0.4f, 0.0f, 0.0f};
     float zero_command_threshold_ = 0.05f;
     float depth_constant_ = 0.7f;
     std::size_t depth_update_period_steps_ = 5;

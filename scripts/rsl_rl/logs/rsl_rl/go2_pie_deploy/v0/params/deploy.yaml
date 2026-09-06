@@ -32,7 +32,8 @@ safety:
     - [-2.721, -0.837]
 
 pie:
-  command_source: keyboard
+  command_source: constant
+  constant_command: [0.4, 0.0, 0.0]
   keyboard_lin_vel_x: 0.4
   keyboard_ang_vel_z: 0.4
   joystick_lin_vel_x: 0.8
