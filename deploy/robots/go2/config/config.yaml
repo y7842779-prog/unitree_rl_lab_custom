@@ -7,6 +7,9 @@ FSM:
     Velocity:
       id: 3
       type: RLBase
+    PIE:
+      id: 5
+      type: PIE
   Passive:
     transitions: 
       FixStand: LT + A.on_pressed
@@ -18,9 +21,11 @@ FSM:
     transitions: 
       Passive: LT + B.on_pressed
       Velocity: start.on_pressed
+      PIE: RT + X.on_pressed
     keyboard_transitions:
       Passive: p
       Velocity: v
+      PIE: i
     kp: [60, 80, 80, 60, 80, 80, 60, 80, 80, 60, 80, 80]
     kd: [5, 4, 4, 5, 4, 4, 5, 4, 4, 5, 4, 4]
     ts: [0, 1, 2]
@@ -39,3 +44,9 @@ FSM:
       enable: true
       path: /home/hyc/unitree_rl_lab/results/policy_lowstate_{time}.csv
       rate: 200
+  PIE:
+    transitions:
+      Passive: LT + B.on_pressed
+    keyboard_transitions:
+      Passive: p
+    policy_dir: config/policy/pie/v0

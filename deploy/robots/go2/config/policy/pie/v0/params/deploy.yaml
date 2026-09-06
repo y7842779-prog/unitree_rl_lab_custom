@@ -1,0 +1,48 @@
+step_dt: 0.02
+
+# PIE ONNX uses this order:
+# FL_hip, FL_thigh, FL_calf,
+# FR_hip, FR_thigh, FR_calf,
+# RL_hip, RL_thigh, RL_calf,
+# RR_hip, RR_thigh, RR_calf.
+#
+# Unitree Go2 SDK motor order is:
+# FR, FL, RR, RL, each as hip/thigh/calf.
+joint_ids_map: [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
+
+default_joint_pos: [-0.1, 0.9, -1.8, 0.1, 0.9, -1.8, -0.1, 0.9, -1.8, 0.1, 0.9, -1.8]
+action_scale: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+stiffness: [20.0, 20.0, 40.0, 20.0, 20.0, 40.0, 20.0, 20.0, 40.0, 20.0, 20.0, 40.0]
+damping: [1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0]
+
+safety:
+  enforce_joint_position_limits: true
+  joint_position_limits:
+    - [-1.047, 1.047]
+    - [-0.663, 2.966]
+    - [-2.721, -0.837]
+    - [-1.047, 1.047]
+    - [-0.663, 2.966]
+    - [-2.721, -0.837]
+    - [-1.047, 1.047]
+    - [-0.663, 2.966]
+    - [-2.721, -0.837]
+    - [-1.047, 1.047]
+    - [-0.663, 2.966]
+    - [-2.721, -0.837]
+
+pie:
+  command_source: keyboard
+  keyboard_lin_vel_x: 0.4
+  keyboard_ang_vel_z: 0.4
+  joystick_lin_vel_x: 0.8
+  joystick_ang_vel_z: 1.2
+  zero_command_threshold: 0.05
+  hold_stand_when_zero: true
+
+  # First deployment version accepts a preprocessed normalized 60x86 depth frame.
+  # Use binary_file after writing one float32 frame to depth_binary_path.
+  depth_provider: constant
+  depth_constant: 0.7
+  depth_binary_path: /tmp/pie_depth_60x86_float32.bin
+  depth_update_period_steps: 5
