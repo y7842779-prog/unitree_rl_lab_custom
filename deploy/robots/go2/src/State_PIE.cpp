@@ -96,6 +96,12 @@ float mean(const std::vector<float>& values)
     return sum / static_cast<float>(values.size());
 }
 
+template <typename Rep, typename Period>
+double elapsed_ms(const std::chrono::duration<Rep, Period>& duration)
+{
+    return std::chrono::duration<double, std::milli>(duration).count();
+}
+
 std::vector<float> depth_samples(const std::vector<float>& depth_history, std::size_t frame_index)
 {
     const std::size_t start = frame_index * kDepthFrameDim;
@@ -245,11 +251,20 @@ void State_PIE::policy_loop()
     const std::chrono::duration<double> desired_duration(step_dt_);
     const auto dt = std::chrono::duration_cast<clock::duration>(desired_duration);
     auto sleep_till = clock::now() + dt;
+    auto timing_window_start = clock::now();
+    std::size_t loop_count = 0;
+    std::size_t act_count = 0;
+    std::size_t depth_update_count = 0;
+    double onnx_elapsed_ms = 0.0;
+    double depth_elapsed_ms = 0.0;
 
     while (policy_thread_running_.load(std::memory_order_acquire)) {
         try {
             if (policy_step_ % depth_update_period_steps_ == 0 || depth_frames_.empty()) {
+                const auto depth_start = clock::now();
                 update_depth_history();
+                depth_elapsed_ms += elapsed_ms(clock::now() - depth_start);
+                ++depth_update_count;
             }
 
             auto proprio = build_proprioception();
@@ -260,7 +275,10 @@ void State_PIE::policy_loop()
             if (!hold_stand_when_zero_ || !command_is_zero(command, zero_command_threshold_)) {
                 auto history = proprio_history_array();
                 auto depth = depth_history_array();
+                const auto onnx_start = clock::now();
                 auto action = policy_->act(proprio, history, depth);
+                onnx_elapsed_ms += elapsed_ms(clock::now() - onnx_start);
+                ++act_count;
                 for (std::size_t i = 0; i < kNumJoints; ++i) {
                     targets[i] = default_joint_pos_[i] + action_scale_[i] * action[i];
                 }
@@ -283,9 +301,47 @@ void State_PIE::policy_loop()
             }
         }
 
+        ++loop_count;
         ++policy_step_;
         std::this_thread::sleep_until(sleep_till);
         sleep_till += dt;
+
+        const auto timing_now = clock::now();
+        const double window_seconds = std::chrono::duration<double>(timing_now - timing_window_start).count();
+        if (window_seconds >= 1.0) {
+            const double loop_hz = static_cast<double>(loop_count) / window_seconds;
+            const double act_hz = static_cast<double>(act_count) / window_seconds;
+            const double depth_hz = static_cast<double>(depth_update_count) / window_seconds;
+            const double avg_loop_dt_ms = 1000.0 / std::max(loop_hz, 1.0e-6);
+            const double avg_onnx_ms = act_count > 0 ? onnx_elapsed_ms / static_cast<double>(act_count) : 0.0;
+            const double avg_depth_ms = depth_update_count > 0
+                ? depth_elapsed_ms / static_cast<double>(depth_update_count)
+                : 0.0;
+            spdlog::info(
+                "[PIE TIMING]\n"
+                "loop_hz        = {:.2f}\n"
+                "act_hz         = {:.2f}\n"
+                "avg_loop_dt    = {:.2f} ms\n"
+                "onnx_avg       = {:.3f} ms\n"
+                "depth_hz       = {:.2f}\n"
+                "depth_read_avg = {:.3f} ms\n"
+                "target_step_dt = {:.2f} ms\n"
+                "depth_period   = {} policy steps",
+                loop_hz,
+                act_hz,
+                avg_loop_dt_ms,
+                avg_onnx_ms,
+                depth_hz,
+                avg_depth_ms,
+                step_dt_ * 1000.0f,
+                depth_update_period_steps_);
+            timing_window_start = timing_now;
+            loop_count = 0;
+            act_count = 0;
+            depth_update_count = 0;
+            onnx_elapsed_ms = 0.0;
+            depth_elapsed_ms = 0.0;
+        }
     }
 }
 
