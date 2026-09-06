@@ -26,7 +26,7 @@ public:
 
 private:
     std::vector<float> build_proprioception();
-    std::vector<float> command_vector() const;
+    std::vector<float> command_vector();
     void update_proprio_history(const std::vector<float>& proprio);
     std::vector<float> proprio_history_array() const;
     void update_depth_history();
@@ -64,6 +64,7 @@ private:
     std::vector<std::vector<float>> depth_frames_;
     std::vector<float> last_action_;
     std::vector<float> latest_targets_;
+    std::vector<float> keyboard_command_{0.0f, 0.0f, 0.0f};
 
     mutable std::mutex target_mtx_;
     std::thread policy_thread_;

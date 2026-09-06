@@ -191,6 +191,7 @@ void State_PIE::enter()
     proprio_frames_.clear();
     depth_frames_.clear();
     policy_step_ = 0;
+    keyboard_command_.assign(3, 0.0f);
     warned_policy_error_.store(false, std::memory_order_relaxed);
 
     for (std::size_t i = 0; i < kNumJoints; ++i) {
@@ -347,7 +348,7 @@ void State_PIE::policy_loop()
     }
 }
 
-std::vector<float> State_PIE::command_vector() const
+std::vector<float> State_PIE::command_vector()
 {
     std::vector<float> command(3, 0.0f);
     if (command_source_ == "constant") {
@@ -360,17 +361,23 @@ std::vector<float> State_PIE::command_vector() const
     if (use_keyboard && FSMState::keyboard) {
         const std::string key = FSMState::keyboard->key();
         if (key == "w" || key == "up") {
-            command[0] = keyboard_lin_vel_x_;
+            keyboard_command_[0] = keyboard_lin_vel_x_;
+            keyboard_command_[1] = 0.0f;
+            keyboard_command_[2] = 0.0f;
         } else if (key == "s" || key == "down") {
-            command[0] = -keyboard_lin_vel_x_;
+            keyboard_command_[0] = -keyboard_lin_vel_x_;
+            keyboard_command_[1] = 0.0f;
+            keyboard_command_[2] = 0.0f;
         } else if (key == "a" || key == "left") {
-            command[2] = keyboard_ang_vel_z_;
+            keyboard_command_[2] = keyboard_ang_vel_z_;
         } else if (key == "d" || key == "right") {
-            command[2] = -keyboard_ang_vel_z_;
+            keyboard_command_[2] = -keyboard_ang_vel_z_;
+        } else if (key == "x" || key == " ") {
+            std::fill(keyboard_command_.begin(), keyboard_command_.end(), 0.0f);
         }
 
-        if (!command_is_zero(command, zero_command_threshold_) || command_source_ == "keyboard") {
-            return command;
+        if (!command_is_zero(keyboard_command_, zero_command_threshold_) || command_source_ == "keyboard") {
+            return keyboard_command_;
         }
     }
 
