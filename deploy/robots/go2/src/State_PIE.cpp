@@ -261,10 +261,10 @@ void State_PIE::policy_loop()
                 auto history = proprio_history_array();
                 auto depth = depth_history_array();
                 auto action = policy_->act(proprio, history, depth);
-                maybe_log_debug(command, proprio, history, depth, action);
                 for (std::size_t i = 0; i < kNumJoints; ++i) {
                     targets[i] = default_joint_pos_[i] + action_scale_[i] * action[i];
                 }
+                maybe_log_debug(command, proprio, history, depth, targets, action);
                 last_action_ = std::move(action);
             } else {
                 last_action_.assign(kNumJoints, 0.0f);
@@ -454,6 +454,7 @@ void State_PIE::maybe_log_debug(
     const std::vector<float>& proprio,
     const std::vector<float>& history,
     const std::vector<float>& depth,
+    const std::vector<float>& targets,
     const std::vector<float>& action) const
 {
     if (debug_log_interval_ == 0 || (policy_step_ % debug_log_interval_) != 0) {
@@ -468,6 +469,22 @@ void State_PIE::maybe_log_debug(
     const std::size_t memory_size = policy_ ? policy_->memory_size() : 0;
     const float memory_norm = policy_ ? policy_->memory_norm() : 0.0f;
     const char* depth_read_status = last_depth_read_complete_ ? "ok" : "fallback";
+    std::vector<float> current_q(kNumJoints, 0.0f);
+    std::vector<float> current_dq(kNumJoints, 0.0f);
+    std::vector<float> target_error(kNumJoints, 0.0f);
+    std::vector<float> estimated_tau(kNumJoints, 0.0f);
+    float max_abs_target_error = 0.0f;
+    for (std::size_t i = 0; i < kNumJoints; ++i) {
+        current_q[i] = proprio[9 + i] + default_joint_pos_[i];
+        current_dq[i] = proprio[21 + i];
+        target_error[i] = targets[i] - current_q[i];
+        estimated_tau[i] = stiffness_[i] * target_error[i] - damping_[i] * current_dq[i];
+        max_abs_target_error = std::max(max_abs_target_error, std::abs(target_error[i]));
+    }
+    const auto target_range = min_max(targets);
+    const auto current_q_range = min_max(current_q);
+    const auto target_error_range = min_max(target_error);
+    const auto estimated_tau_range = min_max(estimated_tau);
 
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(3)
@@ -488,7 +505,18 @@ void State_PIE::maybe_log_debug(
            << "memory norm     = " << memory_norm << "\n\n"
            << "action =\n"
            << format_vector(action) << "\n\n"
-           << "action min/max = [" << action_range.first << ", " << action_range.second << "]";
+           << "action min/max = [" << action_range.first << ", " << action_range.second << "]\n"
+           << "target q =\n"
+           << format_vector(targets) << "\n\n"
+           << "current q =\n"
+           << format_vector(current_q) << "\n\n"
+           << "target-current q =\n"
+           << format_vector(target_error) << "\n\n"
+           << "target q min/max = [" << target_range.first << ", " << target_range.second << "]\n"
+           << "current q min/max = [" << current_q_range.first << ", " << current_q_range.second << "]\n"
+           << "target-current q min/max = [" << target_error_range.first << ", " << target_error_range.second << "]\n"
+           << "target-current q max_abs = " << max_abs_target_error << "\n"
+           << "estimated pd tau min/max = [" << estimated_tau_range.first << ", " << estimated_tau_range.second << "]";
     spdlog::info("{}", stream.str());
 }
 

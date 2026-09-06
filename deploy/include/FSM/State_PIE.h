@@ -37,6 +37,7 @@ private:
         const std::vector<float>& proprio,
         const std::vector<float>& history,
         const std::vector<float>& depth,
+        const std::vector<float>& targets,
         const std::vector<float>& action) const;
     void policy_loop();
     bool bad_orientation(float limit_angle_rad) const;
