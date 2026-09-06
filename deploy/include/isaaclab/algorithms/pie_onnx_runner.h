@@ -46,6 +46,20 @@ public:
         memory_h_.assign(kMemoryDim, 0.0f);
     }
 
+    std::size_t memory_size() const
+    {
+        return memory_h_.size();
+    }
+
+    float memory_norm() const
+    {
+        float squared_sum = 0.0f;
+        for (const float value : memory_h_) {
+            squared_sum += value * value;
+        }
+        return std::sqrt(squared_sum);
+    }
+
     std::vector<float> act(
         std::vector<float>& proprio,
         std::vector<float>& proprio_history,

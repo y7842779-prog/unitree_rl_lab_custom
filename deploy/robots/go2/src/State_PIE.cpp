@@ -6,8 +6,11 @@
 #include <array>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace
 {
@@ -53,6 +56,29 @@ void require_size(const std::string& name, const std::vector<float>& values, std
             "PIE config '" + name + "' has " + std::to_string(values.size()) +
             " values, expected " + std::to_string(expected) + ".");
     }
+}
+
+std::pair<float, float> min_max(const std::vector<float>& values)
+{
+    if (values.empty()) {
+        return {0.0f, 0.0f};
+    }
+    const auto [min_it, max_it] = std::minmax_element(values.begin(), values.end());
+    return {*min_it, *max_it};
+}
+
+std::string format_vector(const std::vector<float>& values, int precision = 3)
+{
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(precision) << "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) {
+            stream << ", ";
+        }
+        stream << values[i];
+    }
+    stream << "]";
+    return stream.str();
 }
 
 } // namespace
@@ -101,6 +127,7 @@ State_PIE::State_PIE(int state_mode, std::string state_string)
         pie_cfg_,
         "depth_binary_path",
         "/tmp/pie_depth_60x86_float32.bin");
+    debug_log_interval_ = yaml_value<std::size_t>(pie_cfg_, "debug_log_interval", 50);
 
     enforce_joint_position_limits_ = yaml_value<bool>(deploy_cfg_["safety"], "enforce_joint_position_limits", true);
     if (deploy_cfg_["safety"] && deploy_cfg_["safety"]["joint_position_limits"]) {
@@ -206,6 +233,7 @@ void State_PIE::policy_loop()
                 auto history = proprio_history_array();
                 auto depth = depth_history_array();
                 auto action = policy_->act(proprio, history, depth);
+                maybe_log_debug(command, proprio, history, depth, action);
                 for (std::size_t i = 0; i < kNumJoints; ++i) {
                     targets[i] = default_joint_pos_[i] + action_scale_[i] * action[i];
                 }
@@ -382,6 +410,40 @@ std::vector<float> State_PIE::depth_history_array() const
         history.insert(history.end(), frame.begin(), frame.end());
     }
     return history;
+}
+
+void State_PIE::maybe_log_debug(
+    const std::vector<float>& command,
+    const std::vector<float>& proprio,
+    const std::vector<float>& history,
+    const std::vector<float>& depth,
+    const std::vector<float>& action) const
+{
+    if (debug_log_interval_ == 0 || (policy_step_ % debug_log_interval_) != 0) {
+        return;
+    }
+
+    const auto proprio_range = min_max(proprio);
+    const auto depth_range = min_max(depth);
+    const auto action_range = min_max(action);
+    const std::size_t memory_size = policy_ ? policy_->memory_size() : 0;
+    const float memory_norm = policy_ ? policy_->memory_norm() : 0.0f;
+
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(3)
+           << "[PIE]\n"
+           << "command       = " << format_vector(command) << "\n\n"
+           << "proprio size  = " << proprio.size() << "\n"
+           << "history size  = " << history.size() << "\n"
+           << "depth size    = " << depth.size() << "\n"
+           << "memory size   = " << memory_size << "\n\n"
+           << "proprio min/max = [" << proprio_range.first << ", " << proprio_range.second << "]\n"
+           << "depth min/max   = [" << depth_range.first << ", " << depth_range.second << "]\n"
+           << "memory norm     = " << memory_norm << "\n\n"
+           << "action =\n"
+           << format_vector(action) << "\n\n"
+           << "action min/max = [" << action_range.first << ", " << action_range.second << "]";
+    spdlog::info("{}", stream.str());
 }
 
 bool State_PIE::bad_orientation(float limit_angle_rad) const

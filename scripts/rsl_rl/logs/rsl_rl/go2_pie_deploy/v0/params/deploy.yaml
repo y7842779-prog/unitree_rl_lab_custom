@@ -46,3 +46,4 @@ pie:
   depth_constant: 0.7
   depth_binary_path: /tmp/pie_depth_60x86_float32.bin
   depth_update_period_steps: 5
+  debug_log_interval: 50
