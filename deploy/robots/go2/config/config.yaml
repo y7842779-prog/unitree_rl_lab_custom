@@ -49,4 +49,4 @@ FSM:
       Passive: LT + B.on_pressed
     keyboard_transitions:
       Passive: p
-    policy_dir: config/policy/pie/v0
+    policy_dir: /home/hyc/unitree_rl_lab/scripts/rsl_rl/logs/rsl_rl/go2_pie_deploy/v0
