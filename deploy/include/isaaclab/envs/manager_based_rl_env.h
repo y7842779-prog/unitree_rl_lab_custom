@@ -55,6 +55,9 @@ public:
         robot->update();
         action_manager->reset();
         observation_manager->reset();
+        if (alg) {
+            alg->reset();
+        }
     }
 
     void step()

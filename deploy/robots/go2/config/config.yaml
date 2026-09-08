@@ -7,6 +7,9 @@ FSM:
     Velocity:
       id: 3
       type: RLBase
+    ParkourStudent:
+      id: 4
+      type: ParkourStudent
     PIE:
       id: 5
       type: PIE
@@ -21,10 +24,12 @@ FSM:
     transitions: 
       Passive: LT + B.on_pressed
       Velocity: start.on_pressed
+      ParkourStudent: RT + A.on_pressed
       PIE: RT + X.on_pressed
     keyboard_transitions:
       Passive: p
       Velocity: v
+      ParkourStudent: k
       PIE: i
     kp: [60, 80, 80, 60, 80, 80, 60, 80, 80, 60, 80, 80]
     kd: [5, 4, 4, 5, 4, 4, 5, 4, 4, 5, 4, 4]
@@ -44,6 +49,12 @@ FSM:
       enable: true
       path: /home/hyc/unitree_rl_lab/results/policy_lowstate_{time}.csv
       rate: 200
+  ParkourStudent:
+    transitions:
+      Passive: LT + B.on_pressed
+    keyboard_transitions:
+      Passive: p
+    policy_dir: /home/hyc/unitree_rl_lab/scripts/rsl_rl/logs/rsl_rl/unitree_go2_parkour_student/2025-09-03_12-07-56
   PIE:
     transitions:
       Passive: LT + B.on_pressed

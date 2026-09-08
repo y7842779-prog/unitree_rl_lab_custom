@@ -7,6 +7,8 @@
 #include <yaml-cpp/yaml.h>
 #include "isaaclab/envs/manager_based_rl_env.h"
 #include "isaaclab/manager/action_manager.h"
+#include <algorithm>
+#include <deque>
 
 namespace isaaclab
 {
@@ -34,12 +36,46 @@ public:
         if(!cfg["clip"].IsNull()) {
             _clip = cfg["clip"].as<std::vector<std::vector<float> >>();
         }
+        if(cfg["use_delay"] && !cfg["use_delay"].IsNull()) {
+            _use_delay = cfg["use_delay"].as<bool>();
+        }
+        if(cfg["action_delay_steps"] && !cfg["action_delay_steps"].IsNull()) {
+            if(cfg["action_delay_steps"].IsSequence()) {
+                const auto delay_steps = cfg["action_delay_steps"].as<std::vector<int>>();
+                if(!delay_steps.empty()) {
+                    _action_delay_steps = delay_steps.front();
+                }
+            } else {
+                _action_delay_steps = cfg["action_delay_steps"].as<int>();
+            }
+        }
+        if(cfg["history_length"] && !cfg["history_length"].IsNull()) {
+            _history_length = cfg["history_length"].as<int>();
+        }
+        _history_length = std::max(_history_length, _action_delay_steps + 1);
+        _action_history_buf.assign(_history_length, std::vector<float>(_action_dim, 0.0f));
     }
 
     virtual void process_actions(std::vector<float> actions)
     {
         // TODO: modify action by joint_ids
-        _raw_actions = actions;
+        if(_use_delay) {
+            _action_history_buf.push_back(actions);
+            while(static_cast<int>(_action_history_buf.size()) > _history_length) {
+                _action_history_buf.pop_front();
+            }
+            int delayed_index = static_cast<int>(_action_history_buf.size()) - 1 - _action_delay_steps;
+            delayed_index = std::clamp(delayed_index, 0, static_cast<int>(_action_history_buf.size()) - 1);
+            _raw_actions = _action_history_buf[delayed_index];
+        } else {
+            _raw_actions = actions;
+        }
+        if(!_clip.empty())
+        {
+            for(int i(0); i<_action_dim; ++i) {
+                _raw_actions[i] = std::clamp(_raw_actions[i], _clip[i][0], _clip[i][1]);
+            }
+        }
         for(int i(0); i<_action_dim; ++i)
         {
             if(!_scale.empty()) {
@@ -49,12 +85,6 @@ public:
             }
             if(!_offset.empty()) {
                 _processed_actions[i] += _offset[i];
-            }
-        }
-        if(!_clip.empty())
-        {
-            for(int i(0); i<_action_dim; ++i) {
-                _processed_actions[i] = std::clamp(_processed_actions[i], _clip[i][0], _clip[i][1]);
             }
         }
     }
@@ -78,6 +108,7 @@ public:
     void reset()
     {
         _raw_actions.assign(_action_dim, 0.0f);
+        _action_history_buf.assign(_history_length, std::vector<float>(_action_dim, 0.0f));
     }
 
 protected:
@@ -90,6 +121,10 @@ protected:
     std::vector<float> _scale;
     std::vector<float> _offset;
     std::vector<std::vector<float> > _clip;
+    bool _use_delay = false;
+    int _action_delay_steps = 0;
+    int _history_length = 1;
+    std::deque<std::vector<float>> _action_history_buf;
 };
 
 

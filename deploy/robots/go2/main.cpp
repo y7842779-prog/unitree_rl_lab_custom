@@ -2,6 +2,7 @@
 #include "FSM/State_Passive.h"
 #include "FSM/State_FixStand.h"
 #include "FSM/State_RLBase.h"
+#include "FSM/State_ParkourStudent.h"
 #include "FSM/State_PIE.h"
 
 std::unique_ptr<LowCmd_t> FSMState::lowcmd = nullptr;
@@ -45,7 +46,8 @@ int main(int argc, char** argv)
 
     std::cout << "Press [L2 + A] to enter FixStand mode.\n";
     std::cout << "And then press [Start] to start controlling the robot.\n";
-    std::cout << "No joystick keyboard mode: [f] FixStand, [v] Velocity, [i] PIE, [p] Passive.\n";
+    std::cout << "No joystick keyboard mode: [f] FixStand, [v] Velocity, [k] ParkourStudent, [i] PIE, [p] Passive.\n";
+    std::cout << "ParkourStudent keyboard command: [w/up] start/faster, [s/down] slower, [x/space] stop.\n";
     std::cout << "PIE keyboard command: hold [w/s] forward/back, hold [a/d] yaw, release to stop.\n";
 
     while (true)
