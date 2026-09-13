@@ -53,6 +53,11 @@ REGISTER_OBSERVATION(history_projected_gravity)
     return mdp::projected_gravity(env, params);
 }
 
+REGISTER_OBSERVATION(history_velocity_commands)
+{
+    return mdp::velocity_commands(env, params);
+}
+
 REGISTER_OBSERVATION(history_keyboard_velocity_commands)
 {
     return keyboard_velocity_commands(env, params);
