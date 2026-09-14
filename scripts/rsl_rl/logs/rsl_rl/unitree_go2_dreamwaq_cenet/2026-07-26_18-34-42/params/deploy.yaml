@@ -54,7 +54,7 @@ observations:
     clip: null
     scale: null
     history_length: 1
-  velocity_commands:
+  keyboard_velocity_commands:
     params: {command_name: base_velocity}
     clip: null
     scale: null
@@ -84,7 +84,7 @@ observations:
     clip: null
     scale: null
     history_length: 5
-  history_velocity_commands:
+  history_keyboard_velocity_commands:
     params: {command_name: base_velocity}
     clip: null
     scale: null
