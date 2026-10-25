@@ -112,7 +112,13 @@ def main():
     parser.add_argument("--source-root", type=Path, default=Path("/home/hyc/dreamwaq_go2"))
     parser.add_argument("--preview-root", type=Path)
     parser.add_argument("--destination-root", type=Path)
+    parser.add_argument("--keyboard-lateral-speed", type=float, default=0.6,
+                        help="Keyboard lateral command magnitude in m/s (default: 0.6)")
+    parser.add_argument("--keyboard-yaw-speed", type=float, default=0.8,
+                        help="Keyboard yaw command magnitude in rad/s (default: 0.8)")
     args = parser.parse_args()
+    if not all(np.isfinite(v) and v > 0 for v in (args.keyboard_lateral_speed, args.keyboard_yaw_speed)):
+        parser.error("Keyboard speeds must be finite and positive")
     repo = Path(__file__).resolve().parents[1]
     source = args.source_root.resolve()
     preview = (args.preview_root or source/"logs/mujoco_preview/2026-10-25_v2").resolve()
@@ -145,6 +151,12 @@ def main():
         cfg = yaml.safe_load((preview/model/"params/deploy.yaml").read_text())
         env = yaml.load((run/"params/env.yaml").read_text(),Loader=DataLoader)
         validate_deploy(cfg,env,dim)
+        # Explicit deployment commands; keep training and forward-command ranges intact.
+        for axis,speed in (("lin_vel_y",args.keyboard_lateral_speed), ("ang_vel_z",args.keyboard_yaw_speed)):
+            lower,upper = env["commands"]["base_velocity"]["ranges"][axis]
+            if not lower <= -speed <= speed <= upper:
+                raise ValueError(f"{model}: keyboard {axis} +/-{speed} exceeds training range [{lower}, {upper}]")
+            cfg["commands"]["base_velocity"]["ranges"][axis] = [-speed,speed]
         # Keep the first observation a real term: the C++ manager inspects it.
         cfg["observations"]["use_gym_history"] = False
         (target/"params/deploy.yaml").write_text(yaml.safe_dump(cfg,sort_keys=False))
@@ -171,6 +183,7 @@ def main():
         np.testing.assert_allclose(actual,expected,rtol=1e-4,atol=1e-5)
         rows.append(dict(model=model,source_checkpoint=str(run/"model_4999.pt"),checkpoint_sha256=sha(run/"model_4999.pt"),
             policy_directory=str(target),onnx_sha256=sha(policy),input_dim=dim,output_dim=12,
+            keyboard_lateral_speed=args.keyboard_lateral_speed,keyboard_yaw_speed=args.keyboard_yaw_speed,
             parameter_tensors_verified=len(graph.graph.initializer),cpp_history_frames_exact=40,
             max_action_error=float(np.abs(actual-expected).max())))
     assert all(sha(path) == value for path,value in protected.items())

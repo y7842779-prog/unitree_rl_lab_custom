@@ -37,11 +37,14 @@ Focus terminal 2. Press `f`, wait approximately 2–3 seconds for FixStand, then
 The executable's original console hint only mentions `v`; the new numeric keys are
 provided by the YAML configuration and do not require new command-line options.
 
-Hold `w/s` for forward/backward (±0.6 m/s), `a/d` for lateral motion (±0.2 m/s),
-and `q/e` for yaw (±0.3 rad/s). Release to stop the corresponding command.
+Hold `w/s` for forward/backward (±0.6 m/s), `a/d` for lateral motion (±0.6 m/s),
+and `q/e` for yaw (±0.8 rad/s). Release to stop the corresponding command.
 The existing terminal reader handles one key at a time; it does not provide a reliable
-simultaneous forward-and-yaw command. These preview magnitudes are unchanged from
-the previously verified preview bundles and are not changes to training ranges.
+simultaneous forward-and-yaw command. Lateral/yaw commands were increased from
+±0.2 m/s and ±0.3 rad/s after isolated flat-ground trials reproduced weak responses
+at those smaller commands. This changes the requested speed, not the model's
+low-speed tracking ability or its training ranges. Restart `go2_ctrl` after changing
+deployment commands; no compilation is needed. The original `v` policy is unchanged.
 
 Press `f` from a new model state to return to FixStand, wait for the standing
 transition, then select another model. Press `p` for Passive.
@@ -97,7 +100,14 @@ actions against the original PyTorch actor.
 The separate checker links the existing C++ ONNX Runtime; it does not initialize DDS.
 No simulator, closed-loop rollout or parameter update was run in this migration.
 These checks validate export and interface compatibility, not successful locomotion.
-In particular, the earlier weak lateral/yaw response is not established as fixed.
+Subsequent isolated headless MuJoCo trials used the original checkpoint actors,
+the local `scene_flat.xml`, a 0.002 s physics step and a 0.02 s policy period.
+Each trial used the default joint pose at z=0.4 m, 1 s PD settling, 1 s of zero
+policy command, then 7 s of constant command. Final-3-second mean lateral speeds
+at a 0.6 m/s request were 0.419/0.420/0.429 m/s for Asym/CENet/Payload; mean yaw
+rates at a 0.8 rad/s request were 0.475/0.578/0.506 rad/s. These diagnostics motivate
+the new keyboard magnitudes; they do not establish tracking performance in the
+interactive DDS run. Small-command tracking remains a separate evaluation case.
 
 Lowstate CSVs are named by the selected model under `results/payload_comparison/`.
 The existing logger is enabled while the model state is active. Files may be created
@@ -128,6 +138,13 @@ at `dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2` and original checkpoints. It
 not change the controller YAML; if another destination is used, model-selection paths
 must be configured separately. The existing Python launcher only supplies dependencies,
 and no Isaac Sim application or new dependency installation is involved.
+
+New bundles default to lateral ±0.6 m/s and yaw ±0.8 rad/s. To reproduce the
+original smaller keyboard commands, append
+`--keyboard-lateral-speed 0.2 --keyboard-yaw-speed 0.3` to the migration command.
+Both options must be finite, positive and within the saved training ranges.
+Existing installed bundles still require their `params/deploy.yaml` values to be
+updated explicitly; the migration script continues to reject existing destinations.
 
 ## Git scope
 
