@@ -13,6 +13,15 @@ FSM:
     PIE:
       id: 5
       type: PIE
+    AsymPPO:
+      id: 6
+      type: RLBase
+    DreamWaQCENet:
+      id: 7
+      type: RLBase
+    PayloadEstimator:
+      id: 8
+      type: RLBase
   Passive:
     transitions: 
       FixStand: LT + A.on_pressed
@@ -31,6 +40,9 @@ FSM:
       Velocity: v
       ParkourStudent: k
       PIE: i
+      AsymPPO: "1"
+      DreamWaQCENet: "2"
+      PayloadEstimator: "3"
     kp: [60, 80, 80, 60, 80, 80, 60, 80, 80, 60, 80, 80]
     kd: [5, 4, 4, 5, 4, 4, 5, 4, 4, 5, 4, 4]
     ts: [0, 1, 2]
@@ -61,3 +73,39 @@ FSM:
     keyboard_transitions:
       Passive: p
     policy_dir: /home/hyc/unitree_rl_lab/scripts/rsl_rl/logs/rsl_rl/go2_pie_deploy/v0
+
+  AsymPPO:
+    transitions:
+      Passive: LT + B.on_pressed
+    keyboard_transitions:
+      Passive: p
+      FixStand: f
+    policy_dir: /home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06
+    lowstate_log:
+      enable: true
+      path: /home/hyc/unitree_rl_lab/results/payload_comparison/Asym_PPO_{time}.csv
+      rate: 200
+
+  DreamWaQCENet:
+    transitions:
+      Passive: LT + B.on_pressed
+    keyboard_transitions:
+      Passive: p
+      FixStand: f
+    policy_dir: /home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03
+    lowstate_log:
+      enable: true
+      path: /home/hyc/unitree_rl_lab/results/payload_comparison/DreamWaQ_CENet_{time}.csv
+      rate: 200
+
+  PayloadEstimator:
+    transitions:
+      Passive: LT + B.on_pressed
+    keyboard_transitions:
+      Passive: p
+      FixStand: f
+    policy_dir: /home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27
+    lowstate_log:
+      enable: true
+      path: /home/hyc/unitree_rl_lab/results/payload_comparison/PayloadEstimator_{time}.csv
+      rate: 200
