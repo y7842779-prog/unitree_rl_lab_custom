@@ -1,0 +1,61 @@
+{
+  "models": [
+    {
+      "model": "Asym_PPO",
+      "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06/model_4999.pt",
+      "checkpoint_sha256": "26c92d05b5a0321fa80ba411ace5be12f951d266d1bd2fe2d4e0ce3fe9c62dc8",
+      "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06",
+      "onnx_sha256": "ea30e56f6daf0824fa52e90b8e16eaaa1bb4bb0594fea06cb4622ac72a08e714",
+      "input_dim": 45,
+      "output_dim": 12,
+      "parameter_tensors_verified": 8,
+      "cpp_history_frames_exact": 40,
+      "max_action_error": 1.1920928955078125e-06
+    },
+    {
+      "model": "DreamWaQ_CENet",
+      "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03/model_4999.pt",
+      "checkpoint_sha256": "35d3efde9589b8b01067bedc99a8a846752c5ec8b212dd5fe982263b41448a0c",
+      "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03",
+      "onnx_sha256": "28506993f5d4fdf2b54b41aeef75fafdc9435a89dce83c800ee30f25cb07cd72",
+      "input_dim": 270,
+      "output_dim": 12,
+      "parameter_tensors_verified": 16,
+      "cpp_history_frames_exact": 40,
+      "max_action_error": 8.344650268554688e-07
+    },
+    {
+      "model": "PayloadEstimator",
+      "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27/model_4999.pt",
+      "checkpoint_sha256": "32b9145c3e554a322ad0f493c5db2eb287baa80868b6fe8b3796aacaaeb0180a",
+      "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27",
+      "onnx_sha256": "ab82aad7427bf93cfcfd170f1be5aaf8211bd9ae3ceb87513f8090d65b29986a",
+      "input_dim": 1170,
+      "output_dim": 12,
+      "parameter_tensors_verified": 22,
+      "cpp_history_frames_exact": 40,
+      "max_action_error": 8.791685104370117e-07
+    }
+  ],
+  "protected_sha256": {
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06/model_4999.pt": "26c92d05b5a0321fa80ba411ace5be12f951d266d1bd2fe2d4e0ce3fe9c62dc8",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06/params/agent.yaml": "1e32295cbb615f4049a77287f3464f169342e2d3e75f937eff0dbce9beed2b60",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06/params/env.yaml": "7d7f15126e26401aefdd922be14e5d2cc39f8c3585add7c4d263a9b40e4cd9a1",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/Asym_PPO/exported/policy.onnx": "ea30e56f6daf0824fa52e90b8e16eaaa1bb4bb0594fea06cb4622ac72a08e714",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/Asym_PPO/params/deploy.yaml": "2e02292e4c0f7f4816f02bcc4048abef540376abdacffd92324cf36480fa53eb",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03/model_4999.pt": "35d3efde9589b8b01067bedc99a8a846752c5ec8b212dd5fe982263b41448a0c",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03/params/agent.yaml": "461d8b7b7263490245e4b060c056e7756c8365cd421e044f8b58a15a573de892",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03/params/env.yaml": "0d47d5f088b78b40653e4c27aca591b9543677b42fbaa1273262c675b76069bf",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/DreamWaQ_CENet/exported/policy.onnx": "28506993f5d4fdf2b54b41aeef75fafdc9435a89dce83c800ee30f25cb07cd72",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/DreamWaQ_CENet/params/deploy.yaml": "4714e0433e65effe12a319d34b55b0160e6a597e10d0f3e01da85dcb509afdaf",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27/model_4999.pt": "32b9145c3e554a322ad0f493c5db2eb287baa80868b6fe8b3796aacaaeb0180a",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27/params/agent.yaml": "5683eada1ed3a39f9992a27f06a911f609a8df015e25b4db475bfe90661aea15",
+    "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27/params/env.yaml": "d31534ba18bf6284a44b3620bc03cfc4d22816a33601b42c245a799e2f441f12",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/PayloadEstimator/exported/policy.onnx": "ab82aad7427bf93cfcfd170f1be5aaf8211bd9ae3ceb87513f8090d65b29986a",
+    "/home/hyc/dreamwaq_go2/logs/mujoco_preview/2026-10-25_v2/PayloadEstimator/params/deploy.yaml": "c6b322531f76862361fe40de254d9445930055ca88d1c12431cbd37302b171a1"
+  },
+  "controller_repository": "/home/hyc/unitree_rl_lab",
+  "source_repository": "/home/hyc/dreamwaq_go2",
+  "controller_commit": "8b9d397f2e2b6a60fb568b6e4b6782e993c393c9",
+  "note": "Existing verified exports reused. CPU checks only; no DDS, simulator, training or checkpoint changes."
+}

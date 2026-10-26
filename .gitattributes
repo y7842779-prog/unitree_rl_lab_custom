@@ -16,3 +16,6 @@
 *.pt filter=lfs diff=lfs merge=lfs -text
 *.jit filter=lfs diff=lfs merge=lfs -text
 doc/sim2sim.gif filter=lfs diff=lfs merge=lfs -text
+logs/rsl_rl/payload_comparison/*/*/exported/*.onnx filter=lfs diff=lfs merge=lfs -text
+results/payload_rolling/*.zip filter=lfs diff=lfs merge=lfs -text
+results/payload_rolling_terrain/*.zip filter=lfs diff=lfs merge=lfs -text

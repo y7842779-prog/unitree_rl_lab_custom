@@ -1,0 +1,82 @@
+{
+  "repositories": {
+    "/home/hyc/unitree_rl_lab": {
+      "branch": "main",
+      "head": "c9ad7ade68ed5c9938df0351795b61f3a5ad8712",
+      "status_short": ""
+    },
+    "/home/hyc/dreamwaq_go2": {
+      "branch": "feature/dreamwaq-cenet-skeleton",
+      "head": "41b8dfde781ca2377c707940739a3eb8bb6c990a",
+      "status_short": "M scripts/rsl_rl/__pycache__/cli_args.cpython-311.pyc\n?? source/dreamwaq_go2/docs/dreamwaq_algorithm_framework.dot\n?? source/dreamwaq_go2/docs/dreamwaq_algorithm_framework.png\n?? source/dreamwaq_go2/docs/dreamwaq_algorithm_framework.svg\n?? source/dreamwaq_go2/docs/dreamwaq_paper_framework.svg"
+    },
+    "/home/hyc/unitree_mujoco": {
+      "branch": "main",
+      "head": "fcad09ec4335c1db7f70299c97ddf160c51c345a",
+      "status_short": "M example/cpp/CMakeLists.txt\n M example/cpp/stand_go2.cpp\n M simulate/config.yaml\n M simulate/src/main.cc\n M simulate/src/param.h\n M simulate/src/unitree_sdk2_bridge.h\n M simulate_python/Payload_Capacity_oracle.py\n M simulate_python/test_oracle_sim.py\n M simulate_python/unitree_mujoco.py\n M unitree_robots/go2/go2.xml\n M unitree_robots/go2/scene_terrain.xml\n D unitree_robots/go2/scene_terrain_two_stairs.xml\n M unitree_robots/go2_Oracle/scene_terrain.xml\n?? example/cpp/close_motion_service.cpp\n?? example/cpp/go2_low_level_sim2real.cpp\n?? simulate_python/dreamwaq_cenet.py\n?? simulate_python/eval_outputs/\n?? simulate_python/evaluate_cenet_velocity_estimation_rmse.py\n?? simulate_python/evaluate_command_tracking_ate.py\n?? simulate_python/evaluate_command_tracking_policy_ppo.py\n?? simulate_python/origin_mass_data_vx_1.0.csv\n?? simulate_python/parkour_depth_viewer.py\n?? simulate_python/test_oracle_sim_stage1.py\n?? unitree_robots/go2/scene_flat.xml\n?? unitree_robots/go2/scene_lab_gap_jump.xml\n?? unitree_robots/go2/scene_terrain_gentle_low_entry.xml\n?? unitree_robots/go2_Oracle/scene_home_A_narrow_corridor.xml\n?? unitree_robots/go2_Oracle/scene_home_B_living_room.xml\n?? unitree_robots/go2_Oracle/scene_home_B_living_room_fixed_spawn.xml\n?? unitree_robots/go2_Oracle/scene_home_C_bedroom_clutter.xml\n?? unitree_robots/go2_Oracle/scene_home_delivery.xml\n?? unitree_robots/go2_Oracle/scene_home_delivery_complex.xml\n?? unitree_robots/go2_Oracle/scene_home_delivery_fixed_spawn.xml\n?? unitree_robots/go2_Oracle/scene_terrain_backup_2026-06-19.xml\n?? unitree_robots/go2_Oracle_stage1/"
+    }
+  },
+  "commits": [
+    "c9ad7ade68ed5c9938df0351795b61f3a5ad8712 feat: migrate three payload policies and add Go2 model selection",
+    "8b9d397f2e2b6a60fb568b6e4b6782e993c393c9 chore: mark baseline before three-policy payload deployment migration"
+  ],
+  "modified_files": {
+    "deploy/robots/go2/config/config.yaml": "additional RLBase states and model selection keys 1/2/3, preserving original states",
+    "scripts/migrate_payload_comparison.py": "repeatable copy and CPU C++/PyTorch validation",
+    "docs/payload_comparison_deployment.md": "two-terminal instructions and deployment/measurement limitations"
+  },
+  "validation": {
+    "models": [
+      {
+        "model": "Asym_PPO",
+        "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06/model_4999.pt",
+        "checkpoint_sha256": "26c92d05b5a0321fa80ba411ace5be12f951d266d1bd2fe2d4e0ce3fe9c62dc8",
+        "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/Asym_PPO/2026-09-09_21-44-06",
+        "onnx_sha256": "ea30e56f6daf0824fa52e90b8e16eaaa1bb4bb0594fea06cb4622ac72a08e714",
+        "input_dim": 45,
+        "output_dim": 12,
+        "parameter_tensors_verified": 8,
+        "cpp_history_frames_exact": 40,
+        "max_action_error": 1.1920928955078125e-06
+      },
+      {
+        "model": "DreamWaQ_CENet",
+        "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03/model_4999.pt",
+        "checkpoint_sha256": "35d3efde9589b8b01067bedc99a8a846752c5ec8b212dd5fe982263b41448a0c",
+        "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/DreamWaQ_CENet/2026-09-11_20-51-03",
+        "onnx_sha256": "28506993f5d4fdf2b54b41aeef75fafdc9435a89dce83c800ee30f25cb07cd72",
+        "input_dim": 270,
+        "output_dim": 12,
+        "parameter_tensors_verified": 16,
+        "cpp_history_frames_exact": 40,
+        "max_action_error": 8.344650268554688e-07
+      },
+      {
+        "model": "PayloadEstimator",
+        "source_checkpoint": "/home/hyc/dreamwaq_go2/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27/model_4999.pt",
+        "checkpoint_sha256": "32b9145c3e554a322ad0f493c5db2eb287baa80868b6fe8b3796aacaaeb0180a",
+        "policy_directory": "/home/hyc/unitree_rl_lab/logs/rsl_rl/payload_comparison/PayloadEstimator/2026-10-16_21-12-27",
+        "onnx_sha256": "ab82aad7427bf93cfcfd170f1be5aaf8211bd9ae3ceb87513f8090d65b29986a",
+        "input_dim": 1170,
+        "output_dim": 12,
+        "parameter_tensors_verified": 22,
+        "cpp_history_frames_exact": 40,
+        "max_action_error": 8.791685104370117e-07
+      }
+    ],
+    "original_FSM_values_preserved": true,
+    "unique_state_IDs_and_keys": true,
+    "model_paths_resolve": true,
+    "term_major_history_explicit": true,
+    "controller_help_passed": true,
+    "existing_output_rejected_without_overwrite": true,
+    "checkpoints_and_source_exports_unchanged": true,
+    "training_and_mujoco_status_unchanged": true
+  },
+  "new_simulation_runs": 0,
+  "new_training_runs": 0,
+  "controller_recompiled": false,
+  "controller_binary_sha256": "0c79ba706ff46f3c7bc50546d18bf809d6defb48a56ca4804adfeb8440fc5d8e",
+  "note": "Existing logger still lacks actual keyboard commands and body linear velocity; no quantitative closed-loop benchmark is claimed.",
+  "push": false
+}
