@@ -20,8 +20,9 @@ import torch
 import yaml
 
 from migrate_payload_comparison import RUNS, DataLoader, actor_from_checkpoint, validate_deploy
-from rolling_payload_support import (MODELS, CargoMonitor, ball_contacts, build_scene,
-    indices, initial_samples, metrics, observation, sha, state_values, write_csv, write_json)
+from rolling_payload_support import (MODELS, COURSES, CargoMonitor, ball_contacts, build_scene,
+    course_metrics, indices, initial_samples, metrics, observation, sha, state_values,
+    terrain_state, write_csv, write_json)
 
 ROOT = Path(__file__).resolve().parents[1]
 SIGNATURE = mujoco.mjtState.mjSTATE_INTEGRATION
@@ -122,6 +123,7 @@ def rollout(model, idx, initial, sample, label, actor, cfg, args, directory):
     command = np.asarray([.6,0.,0.],dtype=np.float32)
     history, rows, monitor = [], [], CargoMonitor(dt)
     mass_snapshot, inertia_snapshot = model.body_mass.copy(), model.body_inertia.copy()
+    course = COURSES[args.terrain]
     with torch.inference_mode():
         for step in range(round(args.duration/dt)):
             rotation = data.xmat[idx["base"]].reshape(3,3)
@@ -145,8 +147,11 @@ def rollout(model, idx, initial, sample, label, actor, cfg, args, directory):
             np.testing.assert_array_equal(model.body_mass,mass_snapshot)
             np.testing.assert_array_equal(model.body_inertia,inertia_snapshot)
             values = state_values(model,data,idx)
+            if args.terrain != "flat":
+                values.update(terrain_state(values["base_x"],values["base_y"],values["height"],course))
             lost = monitor.update(values,(step+1)*dt)
-            failed = values["height"] < .15 or values["tilt_cosine"] < math.cos(1.)
+            clearance = values["base_terrain_clearance_m"] if args.terrain != "flat" else values["height"]
+            failed = clearance < .15 or values["tilt_cosine"] < math.cos(1.)
             row = dict(model=label,mass_kg=float(model.body_mass[idx["ball"]]),trial=sample["trial"],
                 evaluation_seed=sample["evaluation_seed"],training_seed=42,step=step,
                 time_before_s=step*dt,time_after_s=(step+1)*dt,scored=int(step*dt>=args.warmup-1e-9),
@@ -159,8 +164,11 @@ def rollout(model, idx, initial, sample, label, actor, cfg, args, directory):
                 break
     path = directory/f"trial_{sample['trial']:02d}.csv"
     write_csv(path,rows)
+    scores = metrics(rows,args.duration,args.warmup)
+    if args.terrain != "flat":
+        scores.update(course_metrics(rows,course,args.warmup,scores["transport_completed"]))
     episode = dict(model=label,mass_kg=float(model.body_mass[idx["ball"]]),trial=sample["trial"],
-        evaluation_seed=sample["evaluation_seed"],training_seed=42,**metrics(rows,args.duration,args.warmup))
+        evaluation_seed=sample["evaluation_seed"],training_seed=42,**scores)
     write_json(directory/f"trial_{sample['trial']:02d}_metrics.json",episode)
     return episode
 
@@ -173,11 +181,13 @@ def main(args):
         protected[str(path)] = sha(path)
     samples = initial_samples(args.seed,args.trials)
     assert not ({s["evaluation_seed"] for s in samples} &
-        {s["evaluation_seed"] for prior in (20261025,20261026) for s in initial_samples(prior,10)})
+        {s["evaluation_seed"] for prior in (20261025,20261026,2026102601)
+         if prior != args.seed for s in initial_samples(prior,10)})
     write_json(args.output_dir/"initial_samples.json",samples)
     protocol = dict(status="specified before rollouts",args=vars(args),checkpoints=metadata,
         payload_model="Free sphere with unchanged radius/contacts; base nominal mass; sphere inertia compiled from geom mass",
         comparison="MuJoCo rolling-payload generalization; independent of Isaac Lab/base-mass results",
+        course=COURSES[args.terrain],
         initial_state="One common 2 s stand-PD preparation per mass and trial, full integration state restored for all three actors",
         observation="Original 45/270/1170 inputs, term-major history, deterministic actor/latent means; no true ball state or mass in actor",
         command=[.6,0.,0.],physics_dt=.002,control_dt=.02,
@@ -185,7 +195,8 @@ def main(args):
         score_window="Intervals beginning at >=2s, post-step truth (2,12]s; 500 samples when complete",
         loss_definition="At 50Hz: ball-floor contact OR sphere center beyond tray outer x +/-0.16 plus radius0.04 or y +/-0.11 plus radius0.04 for >=0.1s",
         censoring="Main metrics end at first cargo loss or robot failure; all trials retained and counts shown. Full-window auxiliary metrics retain post-loss data and are NOT full-load scores.",
-        robot_failure="Height <0.15m OR tilt >1rad; no automatic resets",
+        robot_failure="Base clearance above local terrain <0.15m OR tilt >1rad; no automatic resets",
+        course_success="Retain sphere and robot for full horizon, visit terrain, reach goal x on course, and never exit y +/-3m. Supplementary to unchanged primary metrics.",
         motion_check="Scored carried mean body vx<0.1m/s OR consecutive >=2s body vx<0.1m/s",
         git_commit=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),
         git_branch=subprocess.check_output(["git","branch","--show-current"],cwd=ROOT,text=True).strip(),
@@ -194,7 +205,7 @@ def main(args):
     write_json(args.output_dir/"protocol.json",protocol)
     episodes,preparations = [],[]
     for mass in args.masses:
-        model,physics = build_scene(args.scene,args.output_dir/f"scene_{mass:g}kg",mass)
+        model,physics = build_scene(args.scene,args.output_dir/f"scene_{mass:g}kg",mass,args.terrain)
         idx = indices(model)
         initial_dir = args.output_dir/f"initial_{mass:g}kg"
         initial_dir.mkdir()
@@ -210,6 +221,7 @@ def main(args):
                 episode = rollout(model,idx,initial,sample,label,policies[label],configs[label],args,case_dirs[label])
                 episodes.append(episode)
                 print("TRIAL_COMPLETE",mass,label,sample["trial"],"transport",episode["transport_completed"],
+                      "course",episode.get("course_completed","flat"),
                       "loss",episode["cargo_lost"],"robot_fail",episode["failed"],flush=True)
         for label,path in case_dirs.items():
             selected = [e for e in episodes if e["mass_kg"]==mass and e["model"]==label]
@@ -218,13 +230,15 @@ def main(args):
                 trials=len(selected),checkpoint=metadata[label],physics=physics,
                 initial_state_sha256=[p["sha256"] for p in preparations if p["mass_kg"]==mass],
                 exact_integration_state_pairing=True,
-                transport_completed=sum(e["transport_completed"] for e in selected)))
+                transport_completed=sum(e["transport_completed"] for e in selected),
+                course_completed=sum(e.get("course_completed",0) for e in selected)))
     write_csv(args.output_dir/"episode_metrics.csv",episodes)
     write_json(args.output_dir/"preparation_checks.json",preparations)
     assert all(sha(p)==value for p,value in protected.items())
     write_json(args.output_dir/"manifest.json",dict(status="complete",trajectories=len(episodes),
         trials_per_condition=args.trials,masses=args.masses,protected_sha256=protected,checkpoints=metadata,
         transport_completed=sum(e["transport_completed"] for e in episodes),
+        course_completed=sum(e.get("course_completed",0) for e in episodes),
         robot_completed=sum(e["robot_completed"] for e in episodes),
         cargo_losses=sum(e["cargo_lost"] for e in episodes)))
     print("ROLLING_COMPLETE",args.output_dir,"trajectories",len(episodes),flush=True)
@@ -239,6 +253,7 @@ if __name__ == "__main__":
     parser.add_argument("--masses",type=float,nargs="+",default=[2.,4.,6.,8.])
     parser.add_argument("--trials",type=int,default=10)
     parser.add_argument("--seed",type=int,default=2026102601)
+    parser.add_argument("--terrain",choices=tuple(COURSES),default="flat")
     parser.add_argument("--duration",type=float,default=12.)
     parser.add_argument("--warmup",type=float,default=2.)
     parser.add_argument("--settle",type=float,default=2.)

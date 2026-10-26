@@ -17,6 +17,60 @@ METRICS = ("roll_rms", "flatness_penalty", "linear_xy_vector_rmse")
 JOINTS = [f"{leg}_{kind}_joint" for kind in ("hip", "thigh", "calf")
           for leg in ("FL", "FR", "RL", "RR")]
 WIDTHS = (3, 3, 3, 12, 12, 12)
+COURSES = {
+    "flat": dict(kind="flat", start_x_m=1.5, half_width_m=3., goal_x_m=0.),
+    "slope": dict(kind="slope", start_x_m=1.5, half_width_m=3., angle_deg=5.,
+                  run_m=3., goal_x_m=4.9, plateau_end_x_m=12.),
+    "stairs": dict(kind="stairs", start_x_m=1.5, half_width_m=3.,
+                   riser_m=.04, tread_m=.4, steps=4, goal_x_m=3.1,
+                   plateau_end_x_m=12.),
+}
+
+
+def terrain_height(x, y, course):
+    if course["kind"] == "flat" or abs(y) > course["half_width_m"]:
+        return 0.
+    distance = x-course["start_x_m"]
+    if distance < 0:
+        return 0.
+    if course["kind"] == "slope":
+        return min(distance,course["run_m"])*math.tan(math.radians(course["angle_deg"]))
+    step = min(int(distance/course["tread_m"])+1,course["steps"])
+    return step*course["riser_m"]
+
+
+def terrain_state(x, y, height, course):
+    ground = terrain_height(x,y,course)
+    if course["kind"] == "flat":
+        phase = 0
+    elif abs(y) > course["half_width_m"]:
+        phase = 3
+    elif x < course["start_x_m"]:
+        phase = 0
+    elif x < (course["start_x_m"]+(course["run_m"] if course["kind"]=="slope"
+                                    else (course["steps"]-1)*course["tread_m"])):
+        phase = 1
+    else:
+        phase = 2
+    return dict(terrain_height_m=ground,base_terrain_clearance_m=height-ground,
+                terrain_phase=phase)
+
+
+def course_metrics(rows, course, warmup=2., transport_completed=0):
+    """Traversal is reported separately from the unchanged primary scores."""
+    reached = any(int(r["terrain_phase"])==1 for r in rows)
+    goal = any(float(r["base_x"])>=course["goal_x_m"] and
+               abs(float(r["base_y"]))<=course["half_width_m"] for r in rows)
+    left = any(int(r["terrain_phase"])==3 for r in rows)
+    carried = [r for r in rows if float(r["time_before_s"])>=warmup-1e-9 and
+               not int(r["cargo_lost"])]
+    on_course = [r for r in carried if int(r["terrain_phase"]) in (1,2)]
+    return dict(terrain_reached=int(reached),goal_reached=int(goal),route_left=int(left),
+        course_completed=int(bool(transport_completed) and reached and goal and not left),
+        terrain_scored_samples=len(on_course),terrain_scored_s=len(on_course)*.02,
+        min_base_terrain_clearance_m=min(float(r["base_terrain_clearance_m"]) for r in rows),
+        max_world_x_m=max(float(r["base_x"]) for r in rows),
+        final_world_x_m=float(rows[-1]["base_x"]))
 
 
 def sha(path):
@@ -31,7 +85,7 @@ def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False, default=str)+"\n")
 
 
-def build_scene(original, directory, mass):
+def build_scene(original, directory, mass, terrain="flat"):
     """Write evaluation-only copies; infer sphere inertia from its geom mass.
 
     All robot masses, explicit base inertia and collision settings are preserved.
@@ -60,6 +114,30 @@ def build_scene(original, directory, mass):
     ball.set("pos", " ".join(map(str, xyz)))
     robot.write(directory/"robot.xml", encoding="unicode")
     include.set("file", "robot.xml")
+    course = COURSES[terrain].copy()
+    world = scene.getroot().find("worldbody")
+    floor = world.find("geom[@name='floor']")
+    surface = {"material":floor.get("material")} if floor is not None and floor.get("material") else {}
+    width = course["half_width_m"]
+    if terrain == "slope":
+        theta = math.radians(course["angle_deg"])
+        run, thickness = course["run_m"], .05
+        rise = run*math.tan(theta)
+        ET.SubElement(world,"geom",dict(name="eval_slope",type="box",
+            pos=f"{course['start_x_m']+run/2+thickness*math.sin(theta)} 0 {rise/2-thickness*math.cos(theta)}",
+            size=f"{run/(2*math.cos(theta))} {width} {thickness}",
+            quat=f"{math.cos(theta/2)} 0 {-math.sin(theta/2)} 0",**surface))
+        begin, end = course["start_x_m"]+run,course["plateau_end_x_m"]
+        ET.SubElement(world,"geom",dict(name="eval_slope_plateau",type="box",
+            pos=f"{(begin+end)/2} 0 {rise/2}",size=f"{(end-begin)/2} {width} {rise/2}",**surface))
+    elif terrain == "stairs":
+        for i in range(course["steps"]):
+            begin = course["start_x_m"]+i*course["tread_m"]
+            end = begin+course["tread_m"] if i<course["steps"]-1 else course["plateau_end_x_m"]
+            height = (i+1)*course["riser_m"]
+            ET.SubElement(world,"geom",dict(name=f"eval_step_{i+1}",type="box",
+                pos=f"{(begin+end)/2} 0 {height/2}",
+                size=f"{(end-begin)/2} {width} {height/2}",**surface))
     scene.write(directory/"scene.xml", encoding="unicode")
     model = mujoco.MjModel.from_xml_path(str(directory/"scene.xml"))
     base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
@@ -75,8 +153,8 @@ def build_scene(original, directory, mass):
         base_inertia=model.body_inertia[base_id].tolist(), base_com=model.body_ipos[base_id].tolist(),
         physics_dt=float(model.opt.timestep), nq=model.nq, nv=model.nv, nu=model.nu,
         body_masses=model.body_mass.tolist(), body_inertias=model.body_inertia.tolist(),
-        geom_friction=model.geom_friction.tolist(), free_ball=True,
-        overrides="Sphere geom mass, nonpenetrating default height, absolute mesh paths and local include path only")
+        geom_friction=model.geom_friction.tolist(), free_ball=True,course=course,
+        overrides="Sphere geom mass, nonpenetrating default height, absolute mesh paths, local include path and evaluation terrain only")
     write_json(directory/"physics.json", info)
     return model, info
 
@@ -233,4 +311,11 @@ def aggregate(episodes):
         values = [float(r[name]) for r in episodes if r[name] != "" and math.isfinite(float(r[name]))]
         result.update({name+"_mean":statistics.mean(values) if values else "",
                        name+"_sd":statistics.stdev(values) if len(values)>1 else "",name+"_n":len(values)})
+    if "course_completed" in episodes[0]:
+        for name in ("terrain_reached","goal_reached","route_left","course_completed"):
+            result[name] = sum(int(r[name]) for r in episodes)
+        for name in ("terrain_scored_s","min_base_terrain_clearance_m","max_world_x_m","final_world_x_m"):
+            values = [float(r[name]) for r in episodes]
+            result[name+"_mean"] = statistics.mean(values)
+            result[name+"_sd"] = statistics.stdev(values) if len(values)>1 else ""
     return result

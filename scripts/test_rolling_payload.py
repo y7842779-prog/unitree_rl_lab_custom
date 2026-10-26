@@ -7,8 +7,9 @@ import unittest
 import mujoco
 import numpy as np
 
-from rolling_payload_support import (CargoMonitor, METRICS, build_scene, indices,
-    initial_samples, metrics, observation, sha)
+from rolling_payload_support import (COURSES, CargoMonitor, METRICS, build_scene,
+    course_metrics, indices, initial_samples, metrics, observation, sha,
+    terrain_height, terrain_state)
 
 SCENE = Path('/home/hyc/unitree_mujoco/unitree_robots/go2_Oracle/scene.xml')
 
@@ -110,6 +111,47 @@ class RollingChecks(unittest.TestCase):
         self.assertEqual(monitor.update(dict(values,ball_rel_x=0.),.12),1)
         old = {s['evaluation_seed'] for seed in (20261025,20261026) for s in initial_samples(seed,10)}
         self.assertFalse(old & {s['evaluation_seed'] for s in initial_samples(2026102601,10)})
+
+    def test_gentle_course_surface_and_original_robot_physics(self):
+        original = mujoco.MjModel.from_xml_path(str(SCENE))
+        with tempfile.TemporaryDirectory() as tmp:
+            for terrain,points in (("slope",(1.25,2.,3.,4.,4.7)),
+                                   ("stairs",(1.25,1.7,2.1,2.5,3.1))):
+                model,info = build_scene(SCENE,Path(tmp)/terrain,4.,terrain)
+                idx = indices(model)
+                np.testing.assert_array_equal(model.body_mass[:-1],original.body_mass[:-1])
+                np.testing.assert_array_equal(model.body_inertia[:-1],original.body_inertia[:-1])
+                extra = model.ngeom-original.ngeom
+                np.testing.assert_array_equal(model.geom_friction[0],original.geom_friction[0])
+                np.testing.assert_array_equal(model.geom_friction[1+extra:],original.geom_friction[1:])
+                self.assertEqual(info['course'],COURSES[terrain])
+                data = mujoco.MjData(model)
+                mujoco.mj_forward(model,data)
+                for x in points:
+                    ray = mujoco.mj_ray(model,data,np.array([x,1.5,2.]),
+                        np.array([0.,0.,-1.]),None,1,-1,None)
+                    self.assertAlmostEqual(2.-ray,terrain_height(x,1.5,COURSES[terrain]),places=6)
+                self.assertEqual(terrain_height(2.,3.5,COURSES[terrain]),0.)
+
+    def test_course_completion_requires_reaching_obstacle_and_goal(self):
+        course = COURSES['stairs']
+        raw = rows()
+        for r in raw:
+            r.update(base_x=1.4,base_y=0.,height=.32,
+                     **terrain_state(1.4,0.,.32,course))
+        stopped = course_metrics(raw,course,2.,1)
+        self.assertEqual(stopped['course_completed'],0)
+        self.assertEqual(stopped['terrain_scored_samples'],0)
+        for i,r in enumerate(raw):
+            x = 1.4+2.*i/599
+            r.update(base_x=x,**terrain_state(x,0.,.32+terrain_height(x,0.,course),course))
+        passed = course_metrics(raw,course,2.,1)
+        self.assertEqual(passed['course_completed'],1)
+        self.assertGreater(passed['terrain_scored_s'],0.)
+        self.assertLess(terrain_state(3.2,0.,.1,course)['base_terrain_clearance_m'],.15)
+        self.assertFalse({s['evaluation_seed'] for s in initial_samples(2026102602,10)} &
+            {s['evaluation_seed'] for seed in (20261025,20261026,2026102601)
+             for s in initial_samples(seed,10)})
 
 
 if __name__ == '__main__':

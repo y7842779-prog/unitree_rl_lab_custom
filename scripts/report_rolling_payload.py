@@ -9,8 +9,8 @@ from pathlib import Path
 
 import numpy as np
 
-from rolling_payload_support import (MODELS, METRICS, CargoMonitor, aggregate,
-    metrics, observation, sha, write_csv, write_json)
+from rolling_payload_support import (MODELS, METRICS, COURSES, CargoMonitor, aggregate,
+    course_metrics, metrics, observation, sha, terrain_state, write_csv, write_json)
 
 LABELS = dict(zip(MODELS,("Asym PPO","DreamWaQ-CENet","Ours")))
 
@@ -28,6 +28,10 @@ def main(args):
     run = args.run_root
     manifest = json.loads((run/"manifest.json").read_text())
     protocol = json.loads((run/"protocol.json").read_text())
+    terrain = protocol["args"].get("terrain","flat")
+    course = COURSES[terrain]
+    if terrain != "flat":
+        assert protocol["course"] == course
     assert manifest["status"] == "complete"
     if not args.allow_smoke:
         assert manifest["trajectories"]==120 and manifest["trials_per_condition"]==10
@@ -70,7 +74,17 @@ def main(args):
                 for row in rows:
                     assert row["cargo_lost"]==monitor.update(row,row["time_after_s"])
                     assert row["scored"]==int(row["time_before_s"]>=protocol["args"]["warmup"]-1e-9)
+                    if terrain != "flat":
+                        local = terrain_state(row["base_x"],row["base_y"],row["height"],course)
+                        for key,value in local.items():
+                            assert abs(row[key]-value)<1e-10,(path,key,row[key],value)
+                        failed = (local["base_terrain_clearance_m"]<.15 or
+                                  row["tilt_cosine"]<math.cos(1.))
+                        assert row["terminated"]==int(failed)
                 calculated = metrics(rows,protocol["args"]["duration"],protocol["args"]["warmup"])
+                if terrain != "flat":
+                    calculated.update(course_metrics(rows,course,protocol["args"]["warmup"],
+                                                     calculated["transport_completed"]))
                 saved = json.loads((case/f"trial_{trial:02d}_metrics.json").read_text())
                 for key,value in calculated.items():
                     if value=="":
@@ -102,7 +116,9 @@ def main(args):
                                training_seed=42,**calculated)
                 group.append(episode)
                 episodes.append(episode)
-                if not calculated["transport_completed"] or calculated["stall_flag"] or calculated["invalid_samples"]:
+                if (not calculated["transport_completed"] or calculated["stall_flag"] or
+                    calculated["invalid_samples"] or
+                    (terrain != "flat" and not calculated["course_completed"])):
                     anomalies.append(episode)
                 inputs.append(dict(path=str(path.resolve()),sha256=sha(path),rows=len(rows)))
             groups[mass,label] = group
@@ -123,10 +139,14 @@ def main(args):
             for metric in METRICS:
                 a,b = ours[metric+"_mean"],other[metric+"_mean"]
                 pairs = [(o,r) for o,r in zip(groups[mass,"PayloadEstimator"],groups[mass,baseline])
-                         if o["transport_completed"] and r["transport_completed"]]
+                         if ((o["course_completed"] and r["course_completed"])
+                             if terrain != "flat" else
+                             (o["transport_completed"] and r["transport_completed"]))]
                 improvements.append(dict(mass_kg=mass,baseline=baseline,metric=metric,ours_mean=a,baseline_mean=b,
                     relative_improvement_percent=100*(b-a)/b if a!="" and b!="" and b else "",
                     ours_transport_completed=ours["transport_completed"],baseline_transport_completed=other["transport_completed"],
+                    ours_course_completed=ours.get("course_completed",""),
+                    baseline_course_completed=other.get("course_completed",""),
                     complete_pairs=len(pairs),paired_win_count=sum(o[metric]<r[metric] for o,r in pairs)))
     write_csv(args.output_dir/"relative_improvements.csv",improvements)
     import matplotlib
@@ -144,17 +164,18 @@ def main(args):
                 yerr=[r[metric+"_sd"] if r[metric+"_sd"]!="" else 0. for r in selected],
                 label=LABELS[label],color=color,marker=marker,linewidth=1.5,capsize=3)
         ax.set(xlabel="Payload Mass (kg)",ylabel=ylabel,xticks=sorted(manifest["masses"]),
-               title="Rolling sphere: mean ± trial SD")
+               title=("Rolling sphere: mean ± trial SD" if terrain=="flat" else
+                      ("Rolling sphere: 5° slope" if terrain=="slope" else "Rolling sphere: 4 × 4 cm stairs")))
         ax.grid(axis="y",alpha=.22)
         ax.legend(frameon=False,fontsize=9)
         for extension in ("png","pdf"):
             fig.savefig(args.output_dir/f"{metric}.{extension}",dpi=300)
         plt.close(fig)
-    report = ["# MuJoCo 滚动小球负载：三模型对比\n",
+    report = [f"# MuJoCo 滚动小球负载：{terrain} 三模型对比\n",
         f"本次新轨迹 {len(episodes)} 条，评估种子 {protocol['args']['seed']}，训练种子均为42。",
         "只在球上施加2/4/6/8 kg质量，base保持6.921 kg；球半径0.04m，惯量由编译器根据球质量计算。挡板未额外计重，保留原XML碰撞和摩擦。",
         "每负载/初态先共同站立PD预稳定2s，再恢复同一完整积分状态运行各策略；指令[0.6,0,0]，控制50Hz，物理步长0.002s。",
-        "每条12s，前2s过渡；Roll RMS、单位重力水平分量平方均值、机体平面速度向量RMSE，均先逐轨迹计算，再取均值±样本SD。",
+        f"每条{protocol['args']['duration']:g}s，前{protocol['args']['warmup']:g}s过渡；Roll RMS、单位重力水平分量平方均值、机体平面速度向量RMSE，均先逐轨迹计算，再取均值±样本SD。",
         "发生掉球时主要指标仅统计掉球前的满载窗口，并标记截断。原始数据和 full_window_* 辅助指标保留掉球后状态；不得把截短或失载后的低误差排名为更优。",
         "本实验独立于Isaac Lab固定base质量数据；不能将不同引擎的数值差异归因于负载形式。未重新训练、未消融、未修改checkpoint。",
         "\n|负载kg|模型|Roll RMS rad|Flatness|速度RMSE m/s|前进速度m/s|运输完成|掉球|摔倒|停滞|有效样本范围|",
@@ -163,6 +184,14 @@ def main(args):
         vals = [display(r[m+"_mean"])+" ± "+display(r[m+"_sd"]) for m in METRICS]
         report.append(f"|{r['mass_kg']:g}|{LABELS[r['model']]}|"+"|".join(vals)+
             f"|{display(r['mean_vx_mean'],4)}|{r['transport_completed']}/{r['trials']}|{r['cargo_losses']}|{r['robot_failures']}|{r['stalls']}|{r['scored_samples_min']}–{r['scored_samples_max']}|")
+    if terrain != "flat":
+        report += ["\n地形从世界x=1.5m开始；斜坡5°、水平长3m、过顶目标x=4.9m；楼梯4级×4cm、踏面40cm、过顶目标x=3.1m。末端接连续平台。",
+            f"地形完成=机器人和球完整{protocol['args']['duration']:g}s且到达目标且不出侧边界；停在障碍前不算通过。地形暴露时间只统计过渡后仍承载且机身在地形上方的时段。",
+            "三项主指标依然统计完整承载窗口；若未通过地形，低姿态误差不能解释为地形控制优势。斜坡的Flatness按世界重力计算，包含顺坡俯仰，不减5°。",
+            "\n|负载kg|模型|通过/轨迹数|到达地形/轨迹数|到达目标/轨迹数|地形承载暴露秒/轨迹|最大世界x均值m|",
+            "|---:|---|---:|---:|---:|---:|---:|"]
+        for r in conditions:
+            report.append(f"|{r['mass_kg']:g}|{LABELS[r['model']]}|{r['course_completed']}/{r['trials']}|{r['terrain_reached']}/{r['trials']}|{r['goal_reached']}/{r['trials']}|{display(r['terrain_scored_s_mean'],2)}|{display(r['max_world_x_m_mean'],3)}|")
     report += ["\n正数为Ours改善，负数为更差；100×(基线均值−Ours均值)/基线均值。发生失败时先比较完成数，截断误差不能直接排名。",
         "\n|负载kg|相对基线|Roll改善%|Flatness改善%|速度改善%|","|---:|---|---:|---:|---:|"]
     for mass in sorted(manifest["masses"]):

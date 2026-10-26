@@ -100,3 +100,50 @@ Single trained seed42 per policy; ten repetitions reflect initial-state
 variation. This rolling-payload test can assess whole-policy generalization;
 it cannot independently attribute gains to explicit mass estimation or establish
 performance under arbitrary dynamic loads. Retain all earlier fixed-load data.
+
+## Gentle slope and low stairs extension
+
+Use `--terrain slope` or `--terrain stairs`; the default flat protocol above
+remains available and its existing output is not overwritten. The course starts
+at world x=1.5 m after a level run-up and is 6 m wide. The slope rises 5° over
+3 m of horizontal travel (0.2625 m rise), ending at x=4.5 m; its top platform
+continues to x=12 m. The stairs have four 0.04 m risers and 0.40 m treads; the
+fourth step continues as a platform to x=12 m. Goals are x=4.9 m on the slope
+and x=3.1 m on the stairs, so the robot must move beyond the final transition.
+No scene geometry, mass, robot code, checkpoint or original data is changed in
+the two external repositories. Evaluation-only XML copies contain the course.
+
+The base fall threshold is local clearance above the surface (<0.15 m) or
+world tilt >1 rad. The three primary scores and 2–12 s window are unchanged;
+the slope's world-horizontal flatness includes its normal pitch. Additional
+course completion requires robot and sphere to survive all 12 s, to visit the
+course, reach the stated goal, and stay within y=±3 m. Report entrance, goal,
+full course completion, carried exposure on terrain, loss and stagnation for
+every trial. A low error from standing before a step is not traversal evidence.
+Partial carried windows remain visible but must not be ranked over complete
+traversals. Ten trials share common initial states across policies and across
+the two courses, using new base seed **2026102602**; the previous flat seeds
+remain distinct. All scenarios use 2/4/6/8 kg, command [0.6,0,0], 12 s and 2 s
+transition with the unchanged physics, PD and observations.
+
+Example from the repository root (choose fresh output paths):
+
+```bash
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPATH="/home/hyc/miniconda3/envs/env_parkour_deploy/lib/python3.11/site-packages:${PYTHONPATH:-}"
+export PYTHONEXE=/home/hyc/miniconda3/envs/env_isaaclab/bin/python
+
+/home/hyc/miniconda3/envs/env_unitree/bin/python scripts/test_rolling_payload.py
+
+/home/hyc/isaac-sim/python.sh scripts/evaluate_rolling_payload.py \
+  --output-dir <new-root>/slope_formal --terrain slope --seed 2026102602
+/home/hyc/isaac-sim/python.sh scripts/evaluate_rolling_payload.py \
+  --output-dir <new-root>/stairs_formal --terrain stairs --seed 2026102602
+
+MPLCONFIGDIR=/tmp/rolling_payload_matplotlib \
+/home/hyc/miniconda3/envs/env_unitree/bin/python scripts/report_rolling_payload.py \
+  --run-root <new-root>/slope_formal --output-dir <new-root>/slope_summary
+MPLCONFIGDIR=/tmp/rolling_payload_matplotlib \
+/home/hyc/miniconda3/envs/env_unitree/bin/python scripts/report_rolling_payload.py \
+  --run-root <new-root>/stairs_formal --output-dir <new-root>/stairs_summary
+```
